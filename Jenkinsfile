@@ -1,6 +1,6 @@
 // https://github.com/camunda/jenkins-global-shared-library
 // https://github.com/camunda/cambpm-jenkins-shared-library
-@Library(['camunda-ci', 'cambpm-jenkins-shared-library']) _
+@Library(['camunda-ci', 'cambpm-jenkins-shared-library@declarative-pod-specs']) _
 
 def failedStageTypes = []
 
@@ -35,45 +35,77 @@ pipeline {
       }
       steps {
         cambpmConditionalRetry([
-          agentLabel: 'h2_perf32',
+        podSpec: """
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    agent: ap7-ci-build-experiment
+spec:
+  nodeSelector:
+    cloud.google.com/gke-nodepool: agents-n1-standard-32-netssd-stable
+  tolerations:
+    - key: "agents-n1-standard-32-netssd-stable"
+      operator: "Exists"
+      effect: "NoSchedule"
+  containers:
+  - name: maven
+    image: maven:3.8.7-eclipse-temurin-17
+    tty: true
+    command:
+      - sleep
+    args:
+      - 99d
+    env:
+      - name: TZ
+        value: Europe/Berlin
+    resources:
+      limits:
+        cpu: 3000m
+        memory: 60Gi
+      requests:
+        cpu: 3000m
+        memory: 60Gi
+    workingDir: "/home/jenkins/agent"
+""",
           suppressErrors: false,
-          runSteps: {
+          runSteps      : {
+            sh(label: 'GIT: Mark current directory as safe', script: "git config --global --add safe.directory \$PWD")
+            
             withVault([vaultSecrets: [
-                [
-                    path        : 'secret/products/cambpm/ci/xlts.dev',
-                    secretValues: [
-                        [envVar: 'XLTS_REGISTRY', vaultKey: 'registry'],
-                        [envVar: 'XLTS_AUTH_TOKEN', vaultKey: 'authToken']]
-                ]]]) {
+              [
+                path        : 'secret/products/cambpm/ci/xlts.dev',
+                secretValues: [
+                  [envVar: 'XLTS_REGISTRY', vaultKey: 'registry'],
+                  [envVar: 'XLTS_AUTH_TOKEN', vaultKey: 'authToken']]
+              ]]]) {
               cambpmRunMaven('.',
-                  'clean source:jar deploy source:test-jar com.mycila:license-maven-plugin:check -Pdistro,distro-ce,distro-wildfly,distro-webjar,h2-in-memory -DaltStagingDirectory=${WORKSPACE}/staging -DskipRemoteStaging=true',
-                  withCatch: false,
-                  withNpm: true,
-                  // we use JDK 17 to build the artifacts, as it is required for supporting Spring Boot 3
-                  // the compiler source and target is set to JDK 8 in the release parents
-                  jdkVersion: 'jdk-17-latest')
+                'clean source:jar deploy source:test-jar com.mycila:license-maven-plugin:check -Pdistro,distro-ce,distro-wildfly,distro-webjar,h2-in-memory -DaltStagingDirectory=${WORKSPACE}/staging -DskipRemoteStaging=true',
+                withCatch: false,
+                withNpm: true,
+                jdkVersion: null)
             }
-
+  
             // archive all .jar, .pom, .xml, .txt runtime artifacts + required .war/.zip/.tar.gz for EE pipeline
             // add a new line for each group of artifacts
             cambpmArchiveArtifacts('.m2/org/camunda/**/*-SNAPSHOT/**/*.jar,.m2/org/camunda/**/*-SNAPSHOT/**/*.pom,.m2/org/camunda/**/*-SNAPSHOT/**/*.xml,.m2/org/camunda/**/*-SNAPSHOT/**/*.txt',
-                                  '.m2/org/camunda/**/*-SNAPSHOT/**/camunda-webapp*frontend-sources.zip',
-                                  '.m2/org/camunda/**/*-SNAPSHOT/**/license-book*.zip',
-                                  '.m2/org/camunda/**/*-SNAPSHOT/**/camunda-*-assembly*.tar.gz',
-                                  '.m2/org/camunda/**/*-SNAPSHOT/**/camunda-webapp*.war',
-                                  '.m2/org/camunda/**/*-SNAPSHOT/**/camunda-engine-rest*.war',
-                                  '.m2/org/camunda/**/*-SNAPSHOT/**/camunda-example-invoice*.war',
-                                  '.m2/org/camunda/**/*-SNAPSHOT/**/camunda-bpm-run-modules-swaggerui-*-run-swaggerui-license-book-json.json')
-
+              '.m2/org/camunda/**/*-SNAPSHOT/**/camunda-webapp*frontend-sources.zip',
+              '.m2/org/camunda/**/*-SNAPSHOT/**/license-book*.zip',
+              '.m2/org/camunda/**/*-SNAPSHOT/**/camunda-*-assembly*.tar.gz',
+              '.m2/org/camunda/**/*-SNAPSHOT/**/camunda-webapp*.war',
+              '.m2/org/camunda/**/*-SNAPSHOT/**/camunda-engine-rest*.war',
+              '.m2/org/camunda/**/*-SNAPSHOT/**/camunda-example-invoice*.war',
+              '.m2/org/camunda/**/*-SNAPSHOT/**/camunda-bpm-run-modules-swaggerui-*-run-swaggerui-license-book-json.json')
+  
             cambpmStash("platform-stash-runtime",
-                        ".m2/org/camunda/**/*-SNAPSHOT/**",
-                        "**/qa/**,**/*qa*/**,**/*.zip,**/*.tar.gz")
+              ".m2/org/camunda/**/*-SNAPSHOT/**",
+              "**/qa/**,**/*qa*/**,**/*.zip,**/*.tar.gz")
             cambpmStash("platform-stash-archives",
-                        ".m2/org/camunda/bpm/**/*-SNAPSHOT/**/*.zip,.m2/org/camunda/bpm/**/*-SNAPSHOT/**/*.tar.gz")
+              ".m2/org/camunda/bpm/**/*-SNAPSHOT/**/*.zip,.m2/org/camunda/bpm/**/*-SNAPSHOT/**/*.tar.gz")
             cambpmStash("platform-stash-qa",
-                      ".m2/org/camunda/bpm/**/qa/**/*-SNAPSHOT/**,.m2/org/camunda/bpm/**/*qa*/**/*-SNAPSHOT/**",
-                      "**/*.zip,**/*.tar.gz")
-
+              ".m2/org/camunda/bpm/**/qa/**/*-SNAPSHOT/**,.m2/org/camunda/bpm/**/*qa*/**/*-SNAPSHOT/**",
+              "**/*.zip,**/*.tar.gz")
+  
             script {
               if (env.BRANCH_NAME == cambpmDefaultBranch()) {
                 // CE master triggers EE master
@@ -82,22 +114,22 @@ pipeline {
               } else {
                 eeMainProjectBranch = params.EE_DOWNSTREAM
               }
-
+  
               // JOB_NAME, e.g.: '7.15/cambpm-ce/cambpm-main/PR-1373'
               // keep leading slash for the absolute project path
               platformVersionDir = "/" + env.JOB_NAME.split('/')[0]
               upstreamProjectName = "/" + env.JOB_NAME
               upstreamBuildNumber = env.BUILD_NUMBER
-
+  
               if (env.BRANCH_NAME == cambpmDefaultBranch() || cambpmWithLabels('webapp-integration', 'all-as', 'h2', 'websphere', 'weblogic', 'jbosseap', 'run', 'spring-boot', 'e2e')) {
                 cambpmTriggerDownstream(
                   platformVersionDir + "/cambpm-ee/" + eeMainProjectBranch,
                   [string(name: 'UPSTREAM_PROJECT_NAME', value: upstreamProjectName),
-                  string(name: 'UPSTREAM_BUILD_NUMBER', value: upstreamBuildNumber)],
+                   string(name: 'UPSTREAM_BUILD_NUMBER', value: upstreamBuildNumber)],
                   true, true, true, true
                 )
               }
-
+  
               // the sidetrack pipeline should be triggered on daily,
               // or PR builds only, master builds should be excluded.
               // The Sidetrack pipeline contains CRDB and Azure DB stages,
@@ -106,36 +138,35 @@ pipeline {
                 cambpmTriggerDownstream(
                   platformVersionDir + "/cambpm-ce/cambpm-sidetrack/${env.BRANCH_NAME}",
                   [string(name: 'UPSTREAM_PROJECT_NAME', value: upstreamProjectName),
-                  string(name: 'UPSTREAM_BUILD_NUMBER', value: upstreamBuildNumber)]
+                   string(name: 'UPSTREAM_BUILD_NUMBER', value: upstreamBuildNumber)]
                 )
               }
-
+  
               // don't trigger the daily pipeline from a master branch build
               // or if a PR has no relevant labels
               if (env.BRANCH_NAME != cambpmDefaultBranch() && cambpmWithLabels('default-build', 'jdk', 'rolling-update', 'migration', 'wildfly', 'all-db', 'h2', 'db2', 'mysql', 'oracle', 'mariadb', 'sqlserver', 'postgresql')) {
                 cambpmTriggerDownstream(
                   platformVersionDir + "/cambpm-ce/cambpm-daily/${env.BRANCH_NAME}",
                   [string(name: 'UPSTREAM_PROJECT_NAME', value: upstreamProjectName),
-                  string(name: 'UPSTREAM_BUILD_NUMBER', value: upstreamBuildNumber)]
+                   string(name: 'UPSTREAM_BUILD_NUMBER', value: upstreamBuildNumber)]
                 )
               }
-
+  
               // only execute on version (default) branch (e.g. master, 7.15)
               if (env.BRANCH_NAME == cambpmDefaultBranch()) {
                 cambpmRunMaven('.',
-                    'org.sonatype.plugins:nexus-staging-maven-plugin:deploy-staged -DaltStagingDirectory=${WORKSPACE}/staging -DskipStaging=true',
-                    withCatch: false,
-                    withNpm: true)
+                  'org.sonatype.plugins:nexus-staging-maven-plugin:deploy-staged -DaltStagingDirectory=${WORKSPACE}/staging -DskipStaging=true',
+                  withCatch: false,
+                  withNpm: true)
               }
             }
           },
-          postFailure: {
+          postFailure   : {
             cambpmPublishTestResult()
             // archive any heap dumps generated in the target folder
             cambpmArchiveArtifacts(false, '**/target/*.hprof')
           }
         ])
-
       }
     }
     stage('h2 UNIT, engine IT, webapp IT') {
@@ -223,9 +254,9 @@ pipeline {
             cambpmConditionalRetry([
               agentLabel: 'postgresql_142',
               runSteps: {
-                cambpmRunMaven('qa/', 
-                  'clean install -Pwildfly,postgresql,engine-integration-jakarta', 
-                  runtimeStash: true, 
+                cambpmRunMaven('qa/',
+                  'clean install -Pwildfly,postgresql,engine-integration-jakarta',
+                  runtimeStash: true,
                   archiveStash: true,
                   // we need to use JDK 17 for WildFly 27+ + Spring 6
                   jdkVersion: 'jdk-17-latest')
@@ -268,9 +299,9 @@ pipeline {
             cambpmConditionalRetry([
               agentLabel: 'postgresql_142',
               runSteps: {
-                cambpmRunMaven('qa/', 
-                  'clean install -Pwildfly,postgresql,postgresql-xa,engine-integration-jakarta', 
-                  runtimeStash: true, 
+                cambpmRunMaven('qa/',
+                  'clean install -Pwildfly,postgresql,postgresql-xa,engine-integration-jakarta',
+                  runtimeStash: true,
                   archiveStash: true,
                   // we need to use JDK 17 for WildFly 27+ + Spring 6
                   jdkVersion: 'jdk-17-latest')
@@ -491,7 +522,7 @@ pipeline {
             cambpmConditionalRetry([
               agentLabel: 'h2',
               runSteps: {
-                cambpmRunMaven('qa/', 
+                cambpmRunMaven('qa/',
                   'clean install -Pwildfly-domain,h2,engine-integration-jakarta',
                   runtimeStash: true,
                   archiveStash: true,
