@@ -16,99 +16,124 @@
  */
 package org.camunda.bpm.spring.boot.starter.security;
 
-import my.own.custom.spring.boot.project.SampleApplication;
-import org.junit.Before;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import org.camunda.bpm.spring.boot.starter.security.oauth2.CamundaBpmSpringSecurityDisableAutoConfiguration;
+import org.camunda.bpm.spring.boot.starter.security.oauth2.CamundaSpringSecurityOAuth2AutoConfiguration;
+import org.camunda.bpm.spring.boot.starter.security.oauth2.impl.AuthorizeTokenFilter;
+import org.camunda.commons.testing.ProcessEngineLoggingRule;
+import org.junit.Rule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
+import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
-import org.springframework.web.context.WebApplicationContext;
 
-import static org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 
-@RunWith(SpringRunner.class)
-@SpringBootTest(classes = SampleApplication.class, webEnvironment = RANDOM_PORT)
-@TestPropertySource("/oauth2-application.properties")
 @AutoConfigureMockMvc
-public class CamundaBpmSecurityAutoConfigOauth2ApplicationTest {
+@TestPropertySource("/oauth2-mock.properties")
+public class CamundaBpmSecurityAutoConfigOauth2ApplicationTest extends AbstractSpringSecurityTest {
 
-  /**
-   * Docs: https://docs.spring.io/spring-security/reference/servlet/test/mockmvc/setup.html
-   * 
-   * Issues:
-   * 1. TestPropertySource property 'spring.security.oauth2.client.provider.cognito.issuerUri' needs to be an actual URL - Not good: external dependency.
-   * 2. /api urls return 404
-   */
+  private static final String PROVIDER = "mock-provider";
+  public static final String AUTHORIZED_USER = "bob";
+  public static final String UNAUTHORIZED_USER = "mary";
 
-  private String baseUrl;
-
-  @LocalServerPort
-  private int port;
-  
-  @Autowired
-  private WebApplicationContext context;
-  
   @Autowired
   private MockMvc mockMvc;
 
-  @Before
-  public void setup() {
-    baseUrl = String.format("http://localhost:%d", port);
-    System.out.printf("base: %s%n", baseUrl);
+  @Autowired
+  private ClientRegistrationRepository registrations;
 
-    // docs suggest this instead @AutoConfigureMockMvc, but it doesn't change much
-    //mockMvc = MockMvcBuilders.webAppContextSetup(context)
-    //    .apply(SecurityMockMvcConfigurers.springSecurity())
-    //    .build();
-  }
+  @MockBean
+  private OAuth2AuthorizedClientService authorizedClientService;
 
-  private static RequestPostProcessor oidcLogin() {
-    return SecurityMockMvcRequestPostProcessors
-        .oidcLogin()
-        .authorities(new SimpleGrantedAuthority("camunda-admin"));
+  @Rule
+  public ProcessEngineLoggingRule loggingRule = new ProcessEngineLoggingRule().watch(AuthorizeTokenFilter.class.getCanonicalName());
+
+  @Test
+  public void SpringSecurityAutoConfigurationCorrectlySet() {
+    assertThat(getBeanForClass(CamundaSpringSecurityOAuth2AutoConfiguration.class, mockMvc.getDispatcherServlet().getWebApplicationContext())).isNotNull();
+    assertThat(getBeanForClass(CamundaBpmSpringSecurityDisableAutoConfiguration.class, mockMvc.getDispatcherServlet().getWebApplicationContext())).isNull();
   }
 
   @Test
-  public void webappApiWithoutAuthentication() throws Exception {
-    // given - no authentication
-    
+  public void webappWithoutAuthentication() throws Exception {
+    // given no authentication
+
     // when
-    mockMvc.perform(MockMvcRequestBuilders
-            .get(baseUrl + "/camunda/api/engine/engine/default/user")
+    mockMvc.perform(MockMvcRequestBuilders.get(baseUrl + "/camunda/api/engine/engine/default/user")
             .accept(MediaType.APPLICATION_JSON))
-        // then
         .andDo(MockMvcResultHandlers.print())
+        // then
         .andExpect(MockMvcResultMatchers.status().isFound())
         .andExpect(MockMvcResultMatchers.header().exists("Location"))
-        .andExpect(MockMvcResultMatchers.header().string("Location", baseUrl + "/oauth2/authorization/cognito"));
+        .andExpect(MockMvcResultMatchers.header().string("Location", baseUrl + "/oauth2/authorization/" + PROVIDER));
   }
-  
+
   @Test
-  public void webappApiWithOidcAuthentication() throws Exception {
+  public void webappApiWithAuthorizedUser() throws Exception {
+    OAuth2AuthenticationToken authenticationToken = createToken(AUTHORIZED_USER);
+    createAuthorizedClient(authenticationToken);
+
     // when
-    mockMvc.perform(MockMvcRequestBuilders
-            .get(baseUrl + "/camunda/api/engine/engine/default/user")
+    mockMvc.perform(MockMvcRequestBuilders.get(baseUrl + "/camunda/api/engine/engine/default/user")
             .accept(MediaType.APPLICATION_JSON)
-            // given - OAuth2User
-            .with(oidcLogin())
-        )
+            .with(authentication(authenticationToken)))
         // then
         .andDo(MockMvcResultHandlers.print())
-        // TODO returns 404
         .andExpect(MockMvcResultMatchers.status().isOk())
-        .andExpect(MockMvcResultMatchers.content().json("[{\"name\":\"default\"}]"));
+        .andExpect(MockMvcResultMatchers.content().json(EXPECTED_NAME_DEFAULT));
+  }
+
+  @Test
+  public void webappWithUnauthorizedUser() throws Exception {
+    OAuth2AuthenticationToken authenticationToken = createToken(UNAUTHORIZED_USER);
+    createAuthorizedClient(authenticationToken);
+
+    // when
+    mockMvc.perform(MockMvcRequestBuilders.get(baseUrl + "/camunda/api/engine/engine/default/user")
+            .accept(MediaType.APPLICATION_JSON)
+            .with(authentication(authenticationToken)))
+        // then
+        .andExpect(MockMvcResultMatchers.status().isFound())
+        .andExpect(MockMvcResultMatchers.header().exists("Location"))
+        .andExpect(MockMvcResultMatchers.header().string("Location", baseUrl + "/oauth2/authorization/" + PROVIDER));
+
+    String expectedWarn = "Authorize failed for '" + UNAUTHORIZED_USER + "'";
+    assertThat(loggingRule.getFilteredLog(expectedWarn)).hasSize(1);
+  }
+
+  private OAuth2AuthenticationToken createToken(String user) {
+    List<GrantedAuthority> authorities = AuthorityUtils.createAuthorityList("USER");
+    OAuth2User oAuth2User = new DefaultOAuth2User(authorities, Map.of("name", user), "name");
+    return new OAuth2AuthenticationToken(oAuth2User, authorities, PROVIDER);
+  }
+
+  private void createAuthorizedClient(OAuth2AuthenticationToken authenticationToken) {
+    OAuth2AccessToken accessToken = new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, "value", Instant.now(), Instant.now().plus(Duration.ofDays(1)));
+    ClientRegistration clientRegistration = this.registrations.findByRegistrationId(authenticationToken.getAuthorizedClientRegistrationId());
+    OAuth2AuthorizedClient authorizedClient = new OAuth2AuthorizedClient(clientRegistration, authenticationToken.getName(), accessToken);
+    when(this.authorizedClientService.loadAuthorizedClient(PROVIDER, AUTHORIZED_USER)).thenReturn(authorizedClient);
   }
 
 }

@@ -64,6 +64,12 @@
       <artifactId>h2</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.camunda.commons</groupId>
+      <artifactId>camunda-commons-testing</artifactId>
+      <version>${version}</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
 </project>
