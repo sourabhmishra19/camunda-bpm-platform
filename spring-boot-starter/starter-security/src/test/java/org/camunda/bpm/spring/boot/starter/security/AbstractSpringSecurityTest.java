@@ -33,14 +33,14 @@ import org.springframework.web.context.WebApplicationContext;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 abstract class AbstractSpringSecurityTest {
 
-  public static final String EXPECTED_NAME_DEFAULT = "[{\"name\":\"default\"}]";
+  protected static final String EXPECTED_NAME_DEFAULT = "[{\"name\":\"default\"}]";
   protected String baseUrl;
 
   @LocalServerPort
   protected int port;
 
   @Before
-  public void setup() {
+  public void setup() throws Exception {
     baseUrl = format("http://localhost:%d", port);
   }
 

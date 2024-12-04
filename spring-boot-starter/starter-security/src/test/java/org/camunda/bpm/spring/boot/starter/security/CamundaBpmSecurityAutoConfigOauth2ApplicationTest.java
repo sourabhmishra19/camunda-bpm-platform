@@ -16,19 +16,28 @@
  */
 package org.camunda.bpm.spring.boot.starter.security;
 
+import jakarta.servlet.Filter;
+import java.lang.reflect.Field;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.camunda.bpm.engine.rest.security.auth.AuthenticationResult;
 import org.camunda.bpm.spring.boot.starter.security.oauth2.CamundaBpmSpringSecurityDisableAutoConfiguration;
 import org.camunda.bpm.spring.boot.starter.security.oauth2.CamundaSpringSecurityOAuth2AutoConfiguration;
 import org.camunda.bpm.spring.boot.starter.security.oauth2.impl.AuthorizeTokenFilter;
+import org.camunda.bpm.spring.boot.starter.security.oauth2.impl.OAuth2AuthenticationProvider;
+import org.camunda.bpm.webapp.impl.security.auth.ContainerBasedAuthenticationFilter;
 import org.camunda.commons.testing.ProcessEngineLoggingRule;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -40,6 +49,7 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
@@ -47,19 +57,28 @@ import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 
 @AutoConfigureMockMvc
 @TestPropertySource("/oauth2-mock.properties")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class CamundaBpmSecurityAutoConfigOauth2ApplicationTest extends AbstractSpringSecurityTest {
 
-  private static final String PROVIDER = "mock-provider";
-  public static final String AUTHORIZED_USER = "bob";
-  public static final String UNAUTHORIZED_USER = "mary";
+  protected static final String PROVIDER = "mock-provider";
+  protected static final String AUTHORIZED_USER = "bob";
+  protected static final String UNAUTHORIZED_USER = "mary";
 
   @Autowired
   private MockMvc mockMvc;
+
+  @Autowired
+  private FilterRegistrationBean<Filter> filterRegistrationBean;
 
   @Autowired
   private ClientRegistrationRepository registrations;
@@ -70,14 +89,22 @@ public class CamundaBpmSecurityAutoConfigOauth2ApplicationTest extends AbstractS
   @Rule
   public ProcessEngineLoggingRule loggingRule = new ProcessEngineLoggingRule().watch(AuthorizeTokenFilter.class.getCanonicalName());
 
+  private OAuth2AuthenticationProvider spiedAuthenticationProvider;
+
+  @Before
+  public void setup() throws Exception {
+    super.setup();
+    spyAuthenticationProvider();
+  }
+
   @Test
-  public void SpringSecurityAutoConfigurationCorrectlySet() {
+  public void testSpringSecurityAutoConfigurationCorrectlySet() {
     assertThat(getBeanForClass(CamundaSpringSecurityOAuth2AutoConfiguration.class, mockMvc.getDispatcherServlet().getWebApplicationContext())).isNotNull();
     assertThat(getBeanForClass(CamundaBpmSpringSecurityDisableAutoConfiguration.class, mockMvc.getDispatcherServlet().getWebApplicationContext())).isNull();
   }
 
   @Test
-  public void webappWithoutAuthentication() throws Exception {
+  public void testWebappWithoutAuthentication() throws Exception {
     // given no authentication
 
     // when
@@ -91,7 +118,7 @@ public class CamundaBpmSecurityAutoConfigOauth2ApplicationTest extends AbstractS
   }
 
   @Test
-  public void webappApiWithAuthorizedUser() throws Exception {
+  public void testWebappApiWithAuthorizedUser() throws Exception {
     OAuth2AuthenticationToken authenticationToken = createToken(AUTHORIZED_USER);
     createAuthorizedClient(authenticationToken);
 
@@ -103,10 +130,12 @@ public class CamundaBpmSecurityAutoConfigOauth2ApplicationTest extends AbstractS
         .andDo(MockMvcResultHandlers.print())
         .andExpect(MockMvcResultMatchers.status().isOk())
         .andExpect(MockMvcResultMatchers.content().json(EXPECTED_NAME_DEFAULT));
+
+    verify(spiedAuthenticationProvider).extractAuthenticatedUser(any(), any());
   }
 
   @Test
-  public void webappWithUnauthorizedUser() throws Exception {
+  public void testWebappWithUnauthorizedUser() throws Exception {
     OAuth2AuthenticationToken authenticationToken = createToken(UNAUTHORIZED_USER);
     createAuthorizedClient(authenticationToken);
 
@@ -121,7 +150,33 @@ public class CamundaBpmSecurityAutoConfigOauth2ApplicationTest extends AbstractS
 
     String expectedWarn = "Authorize failed for '" + UNAUTHORIZED_USER + "'";
     assertThat(loggingRule.getFilteredLog(expectedWarn)).hasSize(1);
+    verifyNoInteractions(spiedAuthenticationProvider);
   }
+
+
+  @Test
+  public void testOauth2AuthenticationProvider() throws Exception {
+    // given
+    ResultCaptor<AuthenticationResult> resultCaptor = new ResultCaptor<>();
+    doAnswer(resultCaptor).when(spiedAuthenticationProvider).extractAuthenticatedUser(any(), any());
+    OAuth2AuthenticationToken authenticationToken = createToken(AUTHORIZED_USER);
+    createAuthorizedClient(authenticationToken);
+
+    // when
+    mockMvc.perform(MockMvcRequestBuilders.get(baseUrl + "/camunda/api/engine/engine/default/user")
+            .accept(MediaType.APPLICATION_JSON)
+            .with(authentication(authenticationToken)))
+        // then
+        .andDo(MockMvcResultHandlers.print())
+        .andExpect(MockMvcResultMatchers.status().isOk())
+        .andExpect(MockMvcResultMatchers.content().json(EXPECTED_NAME_DEFAULT));
+
+    verify(spiedAuthenticationProvider).extractAuthenticatedUser(any(), any());
+    AuthenticationResult authenticationResult = resultCaptor.result;
+    assertThat(authenticationResult.isAuthenticated()).isTrue();
+    assertThat(authenticationResult.getAuthenticatedUser()).isEqualTo(AUTHORIZED_USER);
+  }
+
 
   private OAuth2AuthenticationToken createToken(String user) {
     List<GrantedAuthority> authorities = AuthorityUtils.createAuthorityList("USER");
@@ -136,4 +191,22 @@ public class CamundaBpmSecurityAutoConfigOauth2ApplicationTest extends AbstractS
     when(this.authorizedClientService.loadAuthorizedClient(PROVIDER, AUTHORIZED_USER)).thenReturn(authorizedClient);
   }
 
+  private void spyAuthenticationProvider() throws NoSuchFieldException, IllegalAccessException {
+    ContainerBasedAuthenticationFilter filter = (ContainerBasedAuthenticationFilter) filterRegistrationBean.getFilter();
+    Field authProviderField = ContainerBasedAuthenticationFilter.class.getDeclaredField("authenticationProvider");
+    authProviderField.setAccessible(true);
+    Object realAuthenticationProvider = authProviderField.get(filter);
+    spiedAuthenticationProvider = (OAuth2AuthenticationProvider) spy(realAuthenticationProvider);
+    authProviderField.set(filter, spiedAuthenticationProvider);
+  }
+
+  public static class ResultCaptor<T> implements Answer<T> {
+    public T result = null;
+
+    @Override
+    public T answer(InvocationOnMock invocationOnMock) throws Throwable {
+      result = (T) invocationOnMock.callRealMethod();
+      return result;
+    }
+  }
 }
