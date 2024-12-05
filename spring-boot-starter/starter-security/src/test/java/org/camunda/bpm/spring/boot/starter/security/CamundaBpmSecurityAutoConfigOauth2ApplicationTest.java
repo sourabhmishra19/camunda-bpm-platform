@@ -18,10 +18,6 @@ package org.camunda.bpm.spring.boot.starter.security;
 
 import jakarta.servlet.Filter;
 import java.lang.reflect.Field;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
 import org.camunda.bpm.engine.rest.security.auth.AuthenticationResult;
 import org.camunda.bpm.spring.boot.starter.security.oauth2.CamundaBpmSpringSecurityDisableAutoConfiguration;
 import org.camunda.bpm.spring.boot.starter.security.oauth2.CamundaSpringSecurityOAuth2AutoConfiguration;
@@ -32,23 +28,14 @@ import org.camunda.commons.testing.ProcessEngineLoggingRule;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.AuthorityUtils;
-import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
-import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.security.oauth2.core.OAuth2AccessToken;
-import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
-import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -62,7 +49,6 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 
 @AutoConfigureMockMvc
@@ -70,8 +56,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class CamundaBpmSecurityAutoConfigOauth2ApplicationTest extends AbstractSpringSecurityTest {
 
-  protected static final String PROVIDER = "mock-provider";
-  protected static final String AUTHORIZED_USER = "bob";
   protected static final String UNAUTHORIZED_USER = "mary";
 
   @Autowired
@@ -119,8 +103,9 @@ public class CamundaBpmSecurityAutoConfigOauth2ApplicationTest extends AbstractS
 
   @Test
   public void testWebappApiWithAuthorizedUser() throws Exception {
+    // given authorized oauth2 authentication token
     OAuth2AuthenticationToken authenticationToken = createToken(AUTHORIZED_USER);
-    createAuthorizedClient(authenticationToken);
+    createAuthorizedClient(authenticationToken, registrations, authorizedClientService);
 
     // when
     mockMvc.perform(MockMvcRequestBuilders.get(baseUrl + "/camunda/api/engine/engine/default/user")
@@ -136,8 +121,9 @@ public class CamundaBpmSecurityAutoConfigOauth2ApplicationTest extends AbstractS
 
   @Test
   public void testWebappWithUnauthorizedUser() throws Exception {
+    // given unauthorized oauth2 authentication token
     OAuth2AuthenticationToken authenticationToken = createToken(UNAUTHORIZED_USER);
-    createAuthorizedClient(authenticationToken);
+    createAuthorizedClient(authenticationToken, registrations, authorizedClientService);
 
     // when
     mockMvc.perform(MockMvcRequestBuilders.get(baseUrl + "/camunda/api/engine/engine/default/user")
@@ -156,11 +142,11 @@ public class CamundaBpmSecurityAutoConfigOauth2ApplicationTest extends AbstractS
 
   @Test
   public void testOauth2AuthenticationProvider() throws Exception {
-    // given
+    // given authorized oauth2 authentication token
     ResultCaptor<AuthenticationResult> resultCaptor = new ResultCaptor<>();
     doAnswer(resultCaptor).when(spiedAuthenticationProvider).extractAuthenticatedUser(any(), any());
     OAuth2AuthenticationToken authenticationToken = createToken(AUTHORIZED_USER);
-    createAuthorizedClient(authenticationToken);
+    createAuthorizedClient(authenticationToken, registrations, authorizedClientService);
 
     // when
     mockMvc.perform(MockMvcRequestBuilders.get(baseUrl + "/camunda/api/engine/engine/default/user")
@@ -171,24 +157,11 @@ public class CamundaBpmSecurityAutoConfigOauth2ApplicationTest extends AbstractS
         .andExpect(MockMvcResultMatchers.status().isOk())
         .andExpect(MockMvcResultMatchers.content().json(EXPECTED_NAME_DEFAULT));
 
+    // and authentication provider was called and returned expected authentication result
     verify(spiedAuthenticationProvider).extractAuthenticatedUser(any(), any());
     AuthenticationResult authenticationResult = resultCaptor.result;
     assertThat(authenticationResult.isAuthenticated()).isTrue();
     assertThat(authenticationResult.getAuthenticatedUser()).isEqualTo(AUTHORIZED_USER);
-  }
-
-
-  private OAuth2AuthenticationToken createToken(String user) {
-    List<GrantedAuthority> authorities = AuthorityUtils.createAuthorityList("USER");
-    OAuth2User oAuth2User = new DefaultOAuth2User(authorities, Map.of("name", user), "name");
-    return new OAuth2AuthenticationToken(oAuth2User, authorities, PROVIDER);
-  }
-
-  private void createAuthorizedClient(OAuth2AuthenticationToken authenticationToken) {
-    OAuth2AccessToken accessToken = new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, "value", Instant.now(), Instant.now().plus(Duration.ofDays(1)));
-    ClientRegistration clientRegistration = this.registrations.findByRegistrationId(authenticationToken.getAuthorizedClientRegistrationId());
-    OAuth2AuthorizedClient authorizedClient = new OAuth2AuthorizedClient(clientRegistration, authenticationToken.getName(), accessToken);
-    when(this.authorizedClientService.loadAuthorizedClient(PROVIDER, AUTHORIZED_USER)).thenReturn(authorizedClient);
   }
 
   private void spyAuthenticationProvider() throws NoSuchFieldException, IllegalAccessException {
@@ -198,15 +171,5 @@ public class CamundaBpmSecurityAutoConfigOauth2ApplicationTest extends AbstractS
     Object realAuthenticationProvider = authProviderField.get(filter);
     spiedAuthenticationProvider = (OAuth2AuthenticationProvider) spy(realAuthenticationProvider);
     authProviderField.set(filter, spiedAuthenticationProvider);
-  }
-
-  public static class ResultCaptor<T> implements Answer<T> {
-    public T result = null;
-
-    @Override
-    public T answer(InvocationOnMock invocationOnMock) throws Throwable {
-      result = (T) invocationOnMock.callRealMethod();
-      return result;
-    }
   }
 }

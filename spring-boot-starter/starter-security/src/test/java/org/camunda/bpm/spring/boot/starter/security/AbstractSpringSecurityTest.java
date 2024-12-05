@@ -17,13 +17,30 @@
 package org.camunda.bpm.spring.boot.starter.security;
 
 import static java.lang.String.format;
+import static org.mockito.Mockito.when;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import org.camunda.bpm.SampleApplication;
 import org.junit.Before;
 import org.junit.runner.RunWith;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.springframework.beans.BeansException;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
+import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.web.context.WebApplicationContext;
@@ -34,6 +51,9 @@ import org.springframework.web.context.WebApplicationContext;
 abstract class AbstractSpringSecurityTest {
 
   protected static final String EXPECTED_NAME_DEFAULT = "[{\"name\":\"default\"}]";
+  protected static final String PROVIDER = "mock-provider";
+  protected static final String AUTHORIZED_USER = "bob";
+
   protected String baseUrl;
 
   @LocalServerPort
@@ -49,6 +69,31 @@ abstract class AbstractSpringSecurityTest {
       return context.getBean(type);
     } catch (BeansException e) {
       return null;
+    }
+  }
+
+  protected OAuth2AuthenticationToken createToken(String user) {
+    List<GrantedAuthority> authorities = AuthorityUtils.createAuthorityList("USER");
+    OAuth2User oAuth2User = new DefaultOAuth2User(authorities, Map.of("name", user), "name");
+    return new OAuth2AuthenticationToken(oAuth2User, authorities, AbstractSpringSecurityTest.PROVIDER);
+  }
+
+  protected void createAuthorizedClient(OAuth2AuthenticationToken authenticationToken,
+                                        ClientRegistrationRepository registrations,
+                                        OAuth2AuthorizedClientService authorizedClientService) {
+    OAuth2AccessToken accessToken = new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, "value", Instant.now(), Instant.now().plus(Duration.ofDays(1)));
+    ClientRegistration clientRegistration = registrations.findByRegistrationId(authenticationToken.getAuthorizedClientRegistrationId());
+    OAuth2AuthorizedClient authorizedClient = new OAuth2AuthorizedClient(clientRegistration, authenticationToken.getName(), accessToken);
+    when(authorizedClientService.loadAuthorizedClient(AbstractSpringSecurityTest.PROVIDER, AbstractSpringSecurityTest.AUTHORIZED_USER)).thenReturn(authorizedClient);
+  }
+
+  protected static class ResultCaptor<T> implements Answer<T> {
+    public T result = null;
+
+    @Override
+    public T answer(InvocationOnMock invocationOnMock) throws Throwable {
+      result = (T) invocationOnMock.callRealMethod();
+      return result;
     }
   }
 
