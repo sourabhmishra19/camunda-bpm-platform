@@ -14,10 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.camunda.bpm.spring.boot.starter.security;
+package org.camunda.bpm.spring.boot.starter.security.oauth2;
 
-import org.camunda.bpm.spring.boot.starter.security.oauth2.CamundaBpmSpringSecurityDisableAutoConfiguration;
-import org.camunda.bpm.spring.boot.starter.security.oauth2.CamundaSpringSecurityOAuth2AutoConfiguration;
 import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -36,19 +34,19 @@ public class CamundaBpmSampleApplicationTest extends AbstractSpringSecurityTest 
   private WebApplicationContext webApplicationContext;
 
   @Test
-  public void SpringSecurityAutoConfigurationCorrectlySet() {
+  public void testSpringSecurityAutoConfigurationCorrectlySet() {
     assertThat(getBeanForClass(CamundaSpringSecurityOAuth2AutoConfiguration.class, webApplicationContext)).isNull();
     assertThat(getBeanForClass(CamundaBpmSpringSecurityDisableAutoConfiguration.class, webApplicationContext)).isNotNull();
   }
 
   @Test
-  public void webappApiIsAvailableAndAuthorized() {
+  public void testWebappApiIsAvailableAndAuthorized() {
     ResponseEntity<String> entity = testRestTemplate.getForEntity(baseUrl + "/camunda/api/engine/engine/default/user", String.class);
     assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
   }
 
   @Test
-  public void restApiIsAvailable() {
+  public void testRestApiIsAvailable() {
     ResponseEntity<String> entity = testRestTemplate.getForEntity(baseUrl + "/engine-rest/engine/", String.class);
     assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(entity.getBody()).isEqualTo(EXPECTED_NAME_DEFAULT);

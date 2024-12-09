@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.camunda.bpm.spring.boot.starter.security;
+package org.camunda.bpm.spring.boot.starter.security.oauth2;
 
 import static java.lang.String.format;
 import static org.mockito.Mockito.when;
@@ -23,7 +23,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import org.camunda.bpm.SampleApplication;
+import org.camunda.bpm.spring.boot.starter.security.SampleApplication;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.mockito.invocation.InvocationOnMock;
@@ -48,7 +48,7 @@ import org.springframework.web.context.WebApplicationContext;
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = SampleApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-abstract class AbstractSpringSecurityTest {
+public abstract class AbstractSpringSecurityTest {
 
   protected static final String EXPECTED_NAME_DEFAULT = "[{\"name\":\"default\"}]";
   protected static final String PROVIDER = "mock-provider";
@@ -87,7 +87,7 @@ abstract class AbstractSpringSecurityTest {
     when(authorizedClientService.loadAuthorizedClient(AbstractSpringSecurityTest.PROVIDER, AbstractSpringSecurityTest.AUTHORIZED_USER)).thenReturn(authorizedClient);
   }
 
-  protected static class ResultCaptor<T> implements Answer<T> {
+  public static class ResultCaptor<T> implements Answer<T> {
     public T result = null;
 
     @Override

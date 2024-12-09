@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.camunda.bpm.spring.boot.starter.security;
+package org.camunda.bpm.spring.boot.starter.security.oauth2.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.atLeastOnce;
@@ -33,8 +33,7 @@ import org.camunda.bpm.engine.identity.UserQuery;
 import org.camunda.bpm.engine.impl.identity.WritableIdentityProvider;
 import org.camunda.bpm.engine.impl.identity.db.DbGroupQueryImpl;
 import org.camunda.bpm.engine.impl.identity.db.DbUserQueryImpl;
-import org.camunda.bpm.spring.boot.starter.security.oauth2.impl.OAuth2IdentityProvider;
-import org.camunda.bpm.spring.boot.starter.security.oauth2.impl.OAuth2IdentityProviderFactory;
+import org.camunda.bpm.spring.boot.starter.security.oauth2.AbstractSpringSecurityTest;
 import org.junit.Before;
 import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;

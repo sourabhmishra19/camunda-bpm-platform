@@ -14,13 +14,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.camunda.bpm.spring.boot.starter.security;
+package org.camunda.bpm.spring.boot.starter.security.oauth2;
 
 import jakarta.servlet.Filter;
 import java.lang.reflect.Field;
 import org.camunda.bpm.engine.rest.security.auth.AuthenticationResult;
-import org.camunda.bpm.spring.boot.starter.security.oauth2.CamundaBpmSpringSecurityDisableAutoConfiguration;
-import org.camunda.bpm.spring.boot.starter.security.oauth2.CamundaSpringSecurityOAuth2AutoConfiguration;
 import org.camunda.bpm.spring.boot.starter.security.oauth2.impl.AuthorizeTokenFilter;
 import org.camunda.bpm.spring.boot.starter.security.oauth2.impl.OAuth2AuthenticationProvider;
 import org.camunda.bpm.webapp.impl.security.auth.ContainerBasedAuthenticationFilter;
