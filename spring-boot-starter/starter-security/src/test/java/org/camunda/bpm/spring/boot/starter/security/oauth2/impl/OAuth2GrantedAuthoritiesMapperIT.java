@@ -22,7 +22,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.camunda.bpm.spring.boot.starter.security.oauth2.AbstractSpringSecurityTest;
+import org.camunda.bpm.spring.boot.starter.security.oauth2.AbstractSpringSecurityIT;
 import org.camunda.commons.testing.ProcessEngineLoggingRule;
 import org.junit.Rule;
 import org.junit.Test;
@@ -33,7 +33,7 @@ import org.springframework.security.oauth2.core.user.OAuth2UserAuthority;
 import org.springframework.test.context.TestPropertySource;
 
 @TestPropertySource("/oauth2-mock.properties")
-public class OAuth2GrantedAuthoritiesMapperTest extends AbstractSpringSecurityTest {
+public class OAuth2GrantedAuthoritiesMapperIT extends AbstractSpringSecurityIT {
 
   protected static final String GROUP_NAME_ATTRIBUTE = "groupName";
 

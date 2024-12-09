@@ -33,7 +33,7 @@ import org.camunda.bpm.engine.identity.UserQuery;
 import org.camunda.bpm.engine.impl.identity.WritableIdentityProvider;
 import org.camunda.bpm.engine.impl.identity.db.DbGroupQueryImpl;
 import org.camunda.bpm.engine.impl.identity.db.DbUserQueryImpl;
-import org.camunda.bpm.spring.boot.starter.security.oauth2.AbstractSpringSecurityTest;
+import org.camunda.bpm.spring.boot.starter.security.oauth2.AbstractSpringSecurityIT;
 import org.junit.Before;
 import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,7 +56,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 @AutoConfigureMockMvc
 @TestPropertySource("/oauth2-mock.properties")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-public class CamundaIdentityProviderTest extends AbstractSpringSecurityTest {
+public class CamundaIdentityProviderIT extends AbstractSpringSecurityIT {
 
   @Autowired
   private IdentityService identityService;

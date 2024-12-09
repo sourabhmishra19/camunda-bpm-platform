@@ -25,7 +25,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class CamundaBpmSampleApplicationTest extends AbstractSpringSecurityTest {
+public class CamundaBpmSampleApplicationIT extends AbstractSpringSecurityIT {
 
   @Autowired
   private TestRestTemplate testRestTemplate;

@@ -52,7 +52,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 @AutoConfigureMockMvc
 @TestPropertySource("/oauth2-mock.properties")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-public class CamundaBpmSecurityAutoConfigOauth2ApplicationTest extends AbstractSpringSecurityTest {
+public class CamundaBpmSecurityAutoConfigOauth2ApplicationIT extends AbstractSpringSecurityIT {
 
   protected static final String UNAUTHORIZED_USER = "mary";
 

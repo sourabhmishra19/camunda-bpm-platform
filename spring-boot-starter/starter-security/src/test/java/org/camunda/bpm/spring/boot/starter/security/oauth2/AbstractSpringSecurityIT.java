@@ -48,7 +48,7 @@ import org.springframework.web.context.WebApplicationContext;
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = SampleApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public abstract class AbstractSpringSecurityTest {
+public abstract class AbstractSpringSecurityIT {
 
   protected static final String EXPECTED_NAME_DEFAULT = "[{\"name\":\"default\"}]";
   protected static final String PROVIDER = "mock-provider";
@@ -75,7 +75,7 @@ public abstract class AbstractSpringSecurityTest {
   protected OAuth2AuthenticationToken createToken(String user) {
     List<GrantedAuthority> authorities = AuthorityUtils.createAuthorityList("USER");
     OAuth2User oAuth2User = new DefaultOAuth2User(authorities, Map.of("name", user), "name");
-    return new OAuth2AuthenticationToken(oAuth2User, authorities, AbstractSpringSecurityTest.PROVIDER);
+    return new OAuth2AuthenticationToken(oAuth2User, authorities, AbstractSpringSecurityIT.PROVIDER);
   }
 
   protected void createAuthorizedClient(OAuth2AuthenticationToken authenticationToken,
@@ -84,7 +84,7 @@ public abstract class AbstractSpringSecurityTest {
     OAuth2AccessToken accessToken = new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, "value", Instant.now(), Instant.now().plus(Duration.ofDays(1)));
     ClientRegistration clientRegistration = registrations.findByRegistrationId(authenticationToken.getAuthorizedClientRegistrationId());
     OAuth2AuthorizedClient authorizedClient = new OAuth2AuthorizedClient(clientRegistration, authenticationToken.getName(), accessToken);
-    when(authorizedClientService.loadAuthorizedClient(AbstractSpringSecurityTest.PROVIDER, AbstractSpringSecurityTest.AUTHORIZED_USER)).thenReturn(authorizedClient);
+    when(authorizedClientService.loadAuthorizedClient(AbstractSpringSecurityIT.PROVIDER, AbstractSpringSecurityIT.AUTHORIZED_USER)).thenReturn(authorizedClient);
   }
 
   public static class ResultCaptor<T> implements Answer<T> {
