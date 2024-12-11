@@ -109,7 +109,7 @@ public class ExecutionEntityTest {
     // when
     assertNotNull(execution);
     assertEquals(pi.getId(), execution.getProcessInstanceId());
-    assertEquals(pi.getProcessDefinitionKey(), execution.getProcessDefinitionKey());
+    assertEquals("singleTaskProcess", pi.getProcessDefinitionKey());
     processEngineRule.getRuntimeService().signal(execution.getId());
     // then (see #TestLocalVariableTaskListener::notify)
   }
