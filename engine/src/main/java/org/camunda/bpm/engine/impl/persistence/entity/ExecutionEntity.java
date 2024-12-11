@@ -785,8 +785,6 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
       this.processDefinitionId = processDefinition.getId();
       if (processDefinition instanceof ProcessDefinitionEntity) {
         this.processDefinitionKey = ((ProcessDefinitionEntity) processDefinition).getKey();
-      } else {
-        this.processDefinitionKey = null;
       }
     }
     else {
