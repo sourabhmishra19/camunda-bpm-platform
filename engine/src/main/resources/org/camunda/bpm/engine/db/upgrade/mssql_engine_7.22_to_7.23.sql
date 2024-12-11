@@ -14,6 +14,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
+
 insert into ACT_GE_SCHEMA_LOG
 values ('1200', CURRENT_TIMESTAMP, '7.23.0');
 
