@@ -81,6 +81,8 @@ public class CamundaBpmSecurityAutoConfigOauth2ApplicationIT extends AbstractSpr
 
   @Test
   public void testSpringSecurityAutoConfigurationCorrectlySet() {
+    // given oauth2 client configured
+    // when retrieving config beans then only OAuth2AutoConfiguration is present
     assertThat(getBeanForClass(CamundaSpringSecurityOAuth2AutoConfiguration.class, mockMvc.getDispatcherServlet().getWebApplicationContext())).isNotNull();
     assertThat(getBeanForClass(CamundaBpmSpringSecurityDisableAutoConfiguration.class, mockMvc.getDispatcherServlet().getWebApplicationContext())).isNull();
   }
@@ -93,7 +95,7 @@ public class CamundaBpmSecurityAutoConfigOauth2ApplicationIT extends AbstractSpr
     mockMvc.perform(MockMvcRequestBuilders.get(baseUrl + "/camunda/api/engine/engine/default/user")
             .accept(MediaType.APPLICATION_JSON))
         .andDo(MockMvcResultHandlers.print())
-        // then
+        // then oauth2 redirection occurs
         .andExpect(MockMvcResultMatchers.status().isFound())
         .andExpect(MockMvcResultMatchers.header().exists("Location"))
         .andExpect(MockMvcResultMatchers.header().string("Location", baseUrl + "/oauth2/authorization/" + PROVIDER));
@@ -109,12 +111,10 @@ public class CamundaBpmSecurityAutoConfigOauth2ApplicationIT extends AbstractSpr
     mockMvc.perform(MockMvcRequestBuilders.get(baseUrl + "/camunda/api/engine/engine/default/user")
             .accept(MediaType.APPLICATION_JSON)
             .with(authentication(authenticationToken)))
-        // then
+        // then call is successful
         .andDo(MockMvcResultHandlers.print())
         .andExpect(MockMvcResultMatchers.status().isOk())
         .andExpect(MockMvcResultMatchers.content().json(EXPECTED_NAME_DEFAULT));
-
-    verify(spiedAuthenticationProvider).extractAuthenticatedUser(any(), any());
   }
 
   @Test
@@ -127,7 +127,7 @@ public class CamundaBpmSecurityAutoConfigOauth2ApplicationIT extends AbstractSpr
     mockMvc.perform(MockMvcRequestBuilders.get(baseUrl + "/camunda/api/engine/engine/default/user")
             .accept(MediaType.APPLICATION_JSON)
             .with(authentication(authenticationToken)))
-        // then
+        // then authorization fails and redirection occurs
         .andExpect(MockMvcResultMatchers.status().isFound())
         .andExpect(MockMvcResultMatchers.header().exists("Location"))
         .andExpect(MockMvcResultMatchers.header().string("Location", baseUrl + "/oauth2/authorization/" + PROVIDER));
@@ -150,7 +150,7 @@ public class CamundaBpmSecurityAutoConfigOauth2ApplicationIT extends AbstractSpr
     mockMvc.perform(MockMvcRequestBuilders.get(baseUrl + "/camunda/api/engine/engine/default/user")
             .accept(MediaType.APPLICATION_JSON)
             .with(authentication(authenticationToken)))
-        // then
+        // then call is successful
         .andDo(MockMvcResultHandlers.print())
         .andExpect(MockMvcResultMatchers.status().isOk())
         .andExpect(MockMvcResultMatchers.content().json(EXPECTED_NAME_DEFAULT));

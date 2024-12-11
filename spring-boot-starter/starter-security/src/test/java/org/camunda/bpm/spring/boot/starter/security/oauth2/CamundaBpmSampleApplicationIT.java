@@ -35,19 +35,27 @@ public class CamundaBpmSampleApplicationIT extends AbstractSpringSecurityIT {
 
   @Test
   public void testSpringSecurityAutoConfigurationCorrectlySet() {
+    // given oauth2 client not configured
+    // when retrieving config beans then only SpringSecurityDisabledAutoConfiguration is present
     assertThat(getBeanForClass(CamundaSpringSecurityOAuth2AutoConfiguration.class, webApplicationContext)).isNull();
     assertThat(getBeanForClass(CamundaBpmSpringSecurityDisableAutoConfiguration.class, webApplicationContext)).isNotNull();
   }
 
   @Test
-  public void testWebappApiIsAvailableAndAuthorized() {
+  public void testWebappApiIsAvailableAndRequiresAuthorization() {
+    // given oauth2 client disabled
+    // when calling the webapp api
     ResponseEntity<String> entity = testRestTemplate.getForEntity(baseUrl + "/camunda/api/engine/engine/default/user", String.class);
+    // then webapp api returns unauthorized
     assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
   }
 
   @Test
   public void testRestApiIsAvailable() {
+    // given oauth2 client disabled
+    // when calling the rest api
     ResponseEntity<String> entity = testRestTemplate.getForEntity(baseUrl + "/engine-rest/engine/", String.class);
+    // then rest api is accessible
     assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(entity.getBody()).isEqualTo(EXPECTED_NAME_DEFAULT);
   }
