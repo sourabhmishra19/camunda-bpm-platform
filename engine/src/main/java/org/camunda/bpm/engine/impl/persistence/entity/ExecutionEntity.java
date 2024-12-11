@@ -243,7 +243,7 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
    * The name of the process definition key
    */
   protected String processDefinitionKey;
-  
+
   /**
    * Contains observers which are observe the execution.
    * @since 7.6
@@ -531,6 +531,7 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
     removeEventSubscriptionsExceptCompensation();
   }
 
+  @Override
   public void removeAllTasks() {
     // delete all the tasks
     removeTasks();
@@ -559,6 +560,7 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
     removeIncidents();
   }
 
+  @Override
   public void removeVariablesLocalInternal() {
     for (VariableInstanceEntity variableInstance : variableStore.getVariables()) {
       invokeVariableLifecycleListenersDelete(
@@ -759,6 +761,7 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
     this.processDefinitionId = processDefinitionId;
   }
 
+  @Override
   public String getProcessDefinitionId() {
     return processDefinitionId;
   }
@@ -780,7 +783,11 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
     this.processDefinition = processDefinition;
     if (processDefinition != null) {
       this.processDefinitionId = processDefinition.getId();
-      this.processDefinitionKey = getProcessDefinition().getKey();
+      if (processDefinition instanceof ProcessDefinitionEntity) {
+        this.processDefinitionKey = ((ProcessDefinitionEntity) processDefinition).getKey();
+      } else {
+        this.processDefinitionKey = null;
+      }
     }
     else {
       this.processDefinitionId = null;
@@ -827,6 +834,7 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
     return parentId == null;
   }
 
+  @Override
   public boolean isProcessInstanceStarting() {
     // the process instance can only be starting if it is currently in main-memory already
     // we never have to access the database
@@ -1273,6 +1281,7 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
     return Context.getCommandContext().getVariableInstanceManager().findVariableInstancesByExecutionId(id);
   }
 
+  @Override
   public Collection<VariableInstanceEntity> provideVariables(Collection<String> variableNames) {
     return Context.getCommandContext().getVariableInstanceManager().findVariableInstancesByExecutionIdAndVariableNames(id, variableNames);
   }
@@ -1438,6 +1447,7 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
 
   // persistent state /////////////////////////////////////////////////////////
 
+  @Override
   public Object getPersistentState() {
     Map<String, Object> persistentState = new HashMap<>();
     persistentState.put("processDefinitionId", this.processDefinitionId);
@@ -1463,10 +1473,12 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
     Context.getCommandContext().getExecutionManager().insertExecution(this);
   }
 
+  @Override
   public int getRevisionNext() {
     return revision + 1;
   }
 
+  @Override
   public void forceUpdate() {
     Context.getCommandContext().getDbEntityManager().forceUpdate(this);
   }
@@ -1800,6 +1812,7 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
     return cachedEntityState;
   }
 
+  @Override
   public String getRootProcessInstanceId() {
     if (isProcessInstanceExecution()) {
       return rootProcessInstanceId;
@@ -1817,6 +1830,7 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
     this.rootProcessInstanceId = rootProcessInstanceId;
   }
 
+  @Override
   public String getProcessInstanceId() {
     return processInstanceId;
   }
@@ -1838,10 +1852,12 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
     this.parentId = parentId;
   }
 
+  @Override
   public int getRevision() {
     return revision;
   }
 
+  @Override
   public void setRevision(int revision) {
     this.revision = revision;
   }
@@ -1896,6 +1912,7 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
     this.suspensionState = suspensionState;
   }
 
+  @Override
   public boolean isSuspended() {
     return suspensionState == SuspensionState.SUSPENDED.getStateCode();
   }
@@ -1910,6 +1927,7 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
     return activityName;
   }
 
+  @Override
   public FlowElement getBpmnModelElementInstance() {
     BpmnModelInstance bpmnModelInstance = getBpmnModelInstance();
     if (bpmnModelInstance != null) {
@@ -1935,6 +1953,7 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
     }
   }
 
+  @Override
   public BpmnModelInstance getBpmnModelInstance() {
     if (processDefinitionId != null) {
       return Context.getProcessEngineConfiguration().getDeploymentCache().findBpmnModelInstanceForProcessDefinition(processDefinitionId);
@@ -1945,6 +1964,7 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
     }
   }
 
+  @Override
   public ProcessEngineServices getProcessEngineServices() {
     return Context.getProcessEngineConfiguration().getProcessEngine();
   }
@@ -1961,7 +1981,8 @@ public class ExecutionEntity extends PvmExecutionImpl implements Execution, Proc
   public void setProcessDefinitionKey(String processDefinitionKey) {
     this.processDefinitionKey = processDefinitionKey;
   }
-   
+
+  @Override
   public String getProcessDefinitionKey() {
     return processDefinitionKey;
   }
