@@ -26,14 +26,14 @@
     <version.sqlserver>8.4.1.jre8</version.sqlserver>
     <version.db2-11.5>11.5.0.0</version.db2-11.5>
     <version.db2>${version.db2-11.5}</version.db2>
-    <version.postgresql>42.5.5</version.postgresql>
+    <version.postgresql>42.7.4</version.postgresql>
     <version.liquibase>4.8.0</version.liquibase>
 
     <!-- needed for sql script and backward compatibility checks -->
     <camunda.version.old>7.22.0</camunda.version.old>
 
     <!-- Testcontainers JDBC URL parameters. By default, an empty string -->
-    <database.tc.params />
+    <database.tc.params/>
   </properties>
 
   <dependencyManagement>
@@ -155,7 +155,7 @@
         <database.url>jdbc:h2:mem:camunda;DB_CLOSE_DELAY=1000;LOCK_TIMEOUT=10000</database.url>
         <database.driver>org.h2.Driver</database.driver>
         <database.username>sa</database.username>
-        <database.password />
+        <database.password/>
         <hibernate.dialect>org.hibernate.dialect.H2Dialect</hibernate.dialect>
       </properties>
       <dependencies>
